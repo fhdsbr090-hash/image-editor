@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>مُحرر الصور</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom font */
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Style for the canvas display */
+    #imageCanvas {
+      border-radius: 0.75rem; /* rounded-xl */
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+      max-width: 100%;
+      height: auto;
+      background-color: #f0f0f0; /* Light background for transparency */
+      display: block; /* Ensure it takes up space even if empty */
+      margin-left: auto;
+      margin-right: auto;
+    }
+    /* Style for disabled buttons/inputs */
+    .disabled-opacity {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .filter-btn {
+        @apply py-2 px-4 rounded-full font-semibold transition duration-200 ease-in-out transform hover:-translate-y-0.5;
+    }
+    .slider-group label {
+        @apply block text-sm font-medium text-gray-700 mb-1;
+    }
+    .slider-group input[type="range"] {
+        @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+    }
+    .slider-group span {
+        @apply text-sm text-gray-600;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-purple-100 min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl text-center">
+    <h1 class="text-4xl font-extrabold text-blue-800 mb-6">مُحرر الصور المتقدم 📸</h1>
+    <p class="text-gray-600 mb-8">
+      ارفع صورتك، طبق فلاتر، أضف إطارًا، ثم قم بالتحويل والتنزيل!
+    </p>
+
+    <!-- File Input -->
+    <div class="mb-6">
+      <label for="imageUpload" class="block text-lg font-medium text-gray-700 mb-2">
+        اختر صورة:
+      </label>
+      <input type="file" id="imageUpload" accept="image/*" class="w-full text-gray-700
+             file:mr-4 file:py-2 file:px-4
+             file:rounded-full file:border-0
+             file:text-sm file:font-semibold
+             file:bg-blue-50 file:text-blue-700
+             hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
+             cursor-pointer rounded-lg border border-gray-300 p-2">
+    </div>
+
+    <!-- Image Canvas for processing and display -->
+    <div class="mb-8 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300 min-h-[250px] flex items-center justify-center overflow-hidden">
+        <canvas id="imageCanvas"></canvas>
+    </div>
+
+    <!-- Editing Controls -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <!-- Basic Filters -->
+      <div class="bg-gray-50 p-6 rounded-lg shadow-inner">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">التعديلات الأساسية:</h3>
+        <div class="flex flex-col gap-4">
+          <div class="slider-group">
+            <label for="brightnessSlider">السطوع:</label>
+            <input type="range" id="brightnessSlider" min="-100" max="100" value="0" class="disabled-opacity" disabled>
+            <span id="brightnessValue">0%</span>
+          </div>
+          <div class="slider-group">
+            <label for="thresholdSlider">الأسود والأبيض الحاد:</label>
+            <input type="range" id="thresholdSlider" min="0" max="255" value="128" class="disabled-opacity" disabled>
+            <span id="thresholdValue">128</span>
+          </div>
+          <div class="slider-group">
+            <label for="blurSlider">الضبابية:</label>
+            <input type="range" id="blurSlider" min="0" max="5" value="0" class="disabled-opacity" disabled>
+            <span id="blurValue">0 بكسل</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Special Filters -->
+      <div class="bg-gray-50 p-6 rounded-lg shadow-inner">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">الفلاتر الخاصة:</h3>
+        <div class="flex flex-wrap justify-center gap-3">
+          <button id="resetFilterBtn" class="filter-btn bg-gray-300 text-gray-800 hover:bg-gray-400 disabled-opacity" disabled>إعادة تعيين الكل</button>
+          <button id="grayscaleFilterBtn" class="filter-btn bg-blue-500 text-white hover:bg-blue-600 disabled-opacity" disabled>أبيض وأسود</button>
+          <button id="sepiaFilterBtn" class="filter-btn bg-yellow-600 text-white hover:bg-yellow-700 disabled-opacity" disabled>بني داكن (Sepia)</button>
+          <button id="invertFilterBtn" class="filter-btn bg-purple-500 text-white hover:bg-purple-600 disabled-opacity" disabled>عكس الألوان</button>
+          <button id="sketchFilterBtn" class="filter-btn bg-emerald-500 text-white hover:bg-emerald-600 disabled-opacity" disabled>رسم بالقلم الرصاص ✏️</button>
+          <button id="cartoonFilterBtn" class="filter-btn bg-pink-500 text-white hover:bg-pink-600 disabled-opacity" disabled>تأثير كرتوني 🤖</button>
+        </div>
+      </div>
+
+      <!-- Frame Options -->
+      <div class="bg-gray-50 p-6 rounded-lg shadow-inner md:col-span-2"> <!-- Span two columns -->
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">إضافة إطار:</h3>
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+          <div class="w-full md:w-1/2">
+            <label for="frameColor" class="block text-sm font-medium text-gray-700 mb-1">لون الإطار:</label>
+            <input type="color" id="frameColor" value="#000000" class="w-full h-10 rounded-md border border-gray-300 cursor-pointer disabled-opacity" disabled>
+          </div>
+          <div class="w-full md:w-1/2">
+            <label for="frameThickness" class="block text-sm font-medium text-gray-700 mb-1">سمك الإطار (بكسل):</label>
+            <input type="range" id="frameThickness" min="0" max="50" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled-opacity" disabled>
+            <span id="thicknessValue" class="text-sm text-gray-600">0 بكسل</span>
+          </div>
+          <button id="clearFrameBtn" class="bg-red-400 text-white py-2 px-4 rounded-full hover:bg-red-500 transition disabled-opacity" disabled>إزالة الإطار</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Format Selection -->
+    <div class="mb-8">
+      <label for="outputFormat" class="block text-lg font-medium text-gray-700 mb-2">
+        اختر تنسيق الإخراج:
+      </label>
+      <select id="outputFormat" class="w-full p-3 border border-gray-300 rounded-lg shadow-sm
+             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+             bg-white text-gray-800 cursor-pointer disabled-opacity" disabled>
+        <option value="image/jpeg">JPEG</option>
+        <option value="image/png">PNG</option>
+        <option value="image/webp">WebP</option>
+      </select>
+    </div>
+
+    <!-- Download Button -->
+    <button id="downloadBtn" 
+            class="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 px-6 rounded-full
+                   shadow-lg hover:from-green-600 hover:to-teal-600 transition duration-300 ease-in-out
+                   transform hover:-translate-y-1 hover:scale-105 disabled-opacity"
+            disabled>
+      تنزيل الصورة المحررة ✨
+    </button>
+
+    <!-- Message Display -->
+    <div id="message" class="mt-6 text-sm text-gray-700 font-medium"></div>
+
+  </div>
+
+  <script>
+    const imageUpload = document.getElementById('imageUpload');
+    const imageCanvas = document.getElementById('imageCanvas');
+    const ctx = imageCanvas.getContext('2d');
+    const outputFormat = document.getElementById('outputFormat');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const messageDiv = document.getElementById('message');
+
+    // Filter Buttons
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const resetFilterBtn = document.getElementById('resetFilterBtn');
+    const grayscaleFilterBtn = document.getElementById('grayscaleFilterBtn');
+    const sepiaFilterBtn = document.getElementById('sepiaFilterBtn');
+    const invertFilterBtn = document.getElementById('invertFilterBtn');
+    const sketchFilterBtn = document.getElementById('sketchFilterBtn');
+    const cartoonFilterBtn = document.getElementById('cartoonFilterBtn');
+
+    // New Adjustment Sliders
+    const brightnessSlider = document.getElementById('brightnessSlider');
+    const brightnessValueSpan = document.getElementById('brightnessValue');
+    const thresholdSlider = document.getElementById('thresholdSlider');
+    const thresholdValueSpan = document.getElementById('thresholdValue');
+    const blurSlider = document.getElementById('blurSlider');
+    const blurValueSpan = document.getElementById('blurValue');
+
+    // Frame Controls
+    const frameColorInput = document.getElementById('frameColor');
+    const frameThicknessInput = document.getElementById('frameThickness');
+    const thicknessValueSpan = document.getElementById('thicknessValue');
+    const clearFrameBtn = document.getElementById('clearFrameBtn');
+    
+    let originalImage = new Image(); // Stores the original loaded image
+    let currentFilterSettings = { // Stores current filter/adjustment values
+        brightness: 0,
+        threshold: 128,
+        blur: 0,
+        selectedEffect: null // 'grayscale', 'sepia', 'invert', 'sketch', 'cartoon'
+    };
+    let frameSettings = { color: '#000000', thickness: 0 }; // Stores current frame settings
+
+    // --- Utility Function to Enable/Disable Controls ---
+    function setControlsEnabled(enabled) {
+        // Basic Adjustments
+        brightnessSlider.disabled = !enabled;
+        thresholdSlider.disabled = !enabled;
+        blurSlider.disabled = !enabled;
+
+        // Special Filters
+        filterButtons.forEach(btn => btn.disabled = !enabled);
+        resetFilterBtn.disabled = !enabled;
+        grayscaleFilterBtn.disabled = !enabled;
+        sepiaFilterBtn.disabled = !enabled;
+        invertFilterBtn.disabled = !enabled;
+        sketchFilterBtn.disabled = !enabled;
+        cartoonFilterBtn.disabled = !enabled;
+
+        // Frame Controls
+        frameColorInput.disabled = !enabled;
+        frameThicknessInput.disabled = !enabled;
+        clearFrameBtn.disabled = !enabled;
+
+        // Output & Download
+        outputFormat.disabled = !enabled;
+        downloadBtn.disabled = !enabled;
+
+        // Add/remove Tailwind class for visual disabled state
+        const allControls = [
+            brightnessSlider, thresholdSlider, blurSlider,
+            ...filterButtons, resetFilterBtn, grayscaleFilterBtn, sepiaFilterBtn, invertFilterBtn, sketchFilterBtn, cartoonFilterBtn,
+            frameColorInput, frameThicknessInput, clearFrameBtn, outputFormat, downloadBtn
+        ];
+        allControls.forEach(control => {
+            if (!enabled) {
+                control.classList.add('disabled-opacity');
+            } else {
+                control.classList.remove('disabled-opacity');
+            }
+        });
+    }
+
+    // Initialize controls as disabled
+    setControlsEnabled(false);
+
+    // --- Event Listeners ---
+    imageUpload.addEventListener('change', handleImageUpload);
+    downloadBtn.addEventListener('click', downloadImage);
+    
+    // Filter buttons
+    resetFilterBtn.addEventListener('click', resetAllFilters);
+    grayscaleFilterBtn.addEventListener('click', () => applySpecialEffect('grayscale'));
+    sepiaFilterBtn.addEventListener('click', () => applySpecialEffect('sepia'));
+    invertFilterBtn.addEventListener('click', () => applySpecialEffect('invert'));
+    sketchFilterBtn.addEventListener('click', () => applySpecialEffect('sketch'));
+    cartoonFilterBtn.addEventListener('click', () => applySpecialEffect('cartoon'));
+
+    // New adjustment sliders
+    brightnessSlider.addEventListener('input', () => {
+        currentFilterSettings.brightness = parseInt(brightnessSlider.value, 10);
+        brightnessValueSpan.textContent = `${currentFilterSettings.brightness}%`;
+        applyAllFilters();
+    });
+    thresholdSlider.addEventListener('input', () => {
+        currentFilterSettings.threshold = parseInt(thresholdSlider.value, 10);
+        thresholdValueSpan.textContent = `${currentFilterSettings.threshold}`;
+        applyAllFilters();
+    });
+    blurSlider.addEventListener('input', () => {
+        currentFilterSettings.blur = parseInt(blurSlider.value, 10);
+        blurValueSpan.textContent = `${currentFilterSettings.blur} بكسل`;
+        applyAllFilters();
+    });
+
+
+    // Frame controls
+    frameColorInput.addEventListener('input', () => {
+        frameSettings.color = frameColorInput.value;
+        drawImageOnCanvas(); // Redraw with new frame color
+    });
+    frameThicknessInput.addEventListener('input', () => {
+        frameSettings.thickness = parseInt(frameThicknessInput.value, 10);
+        thicknessValueSpan.textContent = `${frameSettings.thickness} بكسل`;
+        drawImageOnCanvas(); // Redraw with new frame thickness
+    });
+    clearFrameBtn.addEventListener('click', () => {
+        frameThicknessInput.value = 0;
+        frameSettings.thickness = 0;
+        thicknessValueSpan.textContent = `0 بكسل`;
+        drawImageOnCanvas(); // Redraw to clear frame
+    });
+
+
+    // --- Core Drawing and Redrawing Logic ---
+
+    /**
+     * Draws the image on the canvas based on current ImageData and then applies the frame.
+     */
+    function drawImageOnCanvas() {
+        if (!originalImage.src) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+
+        // Draw the image data (which has all filters/adjustments applied)
+        if (currentImageData) {
+            ctx.putImageData(currentImageData, 0, 0);
+        } else {
+            // This should ideally not happen if applyAllFilters is always called correctly
+            // But as a fallback, draw original image.
+            ctx.drawImage(originalImage, 0, 0, imageCanvas.width, imageCanvas.height);
+        }
+
+        // Apply frame if thickness is greater than 0
+        if (frameSettings.thickness > 0) {
+            ctx.strokeStyle = frameSettings.color;
+            ctx.lineWidth = frameSettings.thickness * 2; // Multiply by 2 because stroke is centered on the path
+            ctx.strokeRect(frameSettings.thickness, frameSettings.thickness, 
+                           imageCanvas.width - (frameSettings.thickness * 2), 
+                           imageCanvas.height - (frameSettings.thickness * 2));
+        }
+    }
+
+    /**
+     * Resets all filter and adjustment settings to default and redraws.
+     */
+    function resetAllFilters() {
+        // Reset filter settings
+        currentFilterSettings = {
+            brightness: 0,
+            threshold: 128,
+            blur: 0,
+            selectedEffect: null
+        };
+        // Reset UI sliders
+        brightnessSlider.value = 0;
+        brightnessValueSpan.textContent = '0%';
+        thresholdSlider.value = 128;
+        thresholdValueSpan.textContent = '128';
+        blurSlider.value = 0;
+        blurValueSpan.textContent = '0 بكسل';
+        
+        messageDiv.textContent = 'تمت إعادة تعيين جميع الفلاتر.';
+        applyAllFilters(); // Redraw with reset settings
+    }
+
+    /**
+     * Applies a special effect filter (non-slider based) and updates state.
+     * This will override previous special effects.
+     * @param {string|null} effectType - The type of special effect to apply.
+     */
+    function applySpecialEffect(effectType) {
+        if (!originalImage.src) {
+            messageDiv.textContent = 'الرجاء رفع صورة أولاً لتطبيق الفلاتر.';
+            return;
+        }
+        currentFilterSettings.selectedEffect = effectType;
+        messageDiv.textContent = `جاري تطبيق الفلتر: ${effectType || 'لا شيء'}.`;
+        applyAllFilters(); // Apply all filters including the new effect
+    }
+
+    /**
+     * Reapplies all currently selected filters and adjustments to the original image.
+     * This is the core function for updating the canvas display.
+     */
+    function applyAllFilters() {
+        if (!originalImage.src) return;
+
+        // Start with a fresh ImageData from the original image
+        ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+        ctx.drawImage(originalImage, 0, 0, imageCanvas.width, imageCanvas.height);
+        let imageData = ctx.getImageData(0, 0, imageCanvas.width, imageCanvas.height);
+        let pixels = imageData.data;
+
+        // Apply Basic Adjustments first
+        if (currentFilterSettings.brightness !== 0) {
+            imageData = applyBrightness(imageData, currentFilterSettings.brightness);
+            pixels = imageData.data; // Update pixels reference
+        }
+        if (currentFilterSettings.blur > 0) {
+            imageData = applyBoxBlur(imageData, currentFilterSettings.blur);
+            pixels = imageData.data; // Update pixels reference
+        }
+        // Threshold should be applied after brightness/blur for best results
+        // It's a destructive filter, so apply only if it's the main selected effect,
+        // or ensure it's handled carefully. For now, apply after other simple adjustments.
+        if (currentFilterSettings.threshold !== 128 && currentFilterSettings.selectedEffect !== 'sketch' && currentFilterSettings.selectedEffect !== 'cartoon') {
+            imageData = applyThreshold(imageData, currentFilterSettings.threshold);
+            pixels = imageData.data; // Update pixels reference
+        }
+        
+
+        // Apply Special Effects
+        if (currentFilterSettings.selectedEffect === 'grayscale') {
+            for (let i = 0; i < pixels.length; i += 4) {
+                let avg = getLuminosity(pixels[i], pixels[i + 1], pixels[i + 2]);
+                pixels[i] = avg; pixels[i + 1] = avg; pixels[i + 2] = avg;
+            }
+        } else if (currentFilterSettings.selectedEffect === 'sepia') {
+            for (let i = 0; i < pixels.length; i += 4) {
+                let r = pixels[i]; let g = pixels[i + 1]; let b = pixels[i + 2];
+                pixels[i] = Math.min(255, (r * 0.393) + (g * 0.769) + (b * 0.189));
+                pixels[i + 1] = Math.min(255, (r * 0.349) + (g * 0.686) + (b * 0.168));
+                pixels[i + 2] = Math.min(255, (r * 0.272) + (g * 0.534) + (b * 0.131));
+            }
+        } else if (currentFilterSettings.selectedEffect === 'invert') {
+            for (let i = 0; i < pixels.length; i += 4) {
+                pixels[i] = 255 - pixels[i]; pixels[i + 1] = 255 - pixels[i + 1]; pixels[i + 2] = 255 - pixels[i + 2];
+            }
+        } else if (currentFilterSettings.selectedEffect === 'sketch') {
+            // Sketch needs to operate on the original or currently adjusted image.
+            // It applies grayscale, invert, and blur internally.
+            imageData = applySketchEffect(imageData);
+        } else if (currentFilterSettings.selectedEffect === 'cartoon') {
+            imageData = applyCartoonEffect(imageData, 16); // Fixed 16 levels for now
+        }
+
+        // Store the fully processed ImageData
+        currentImageData = imageData; 
+        drawImageOnCanvas(); // Final draw with all adjustments and frame
+    }
+
+
+    // --- Helper Functions for Image Processing (New & Updated) ---
+
+    /**
+     * Converts a pixel's RGB values to a single grayscale value (luminosity method).
+     */
+    function getLuminosity(r, g, b) {
+        return 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+
+    /**
+     * Applies brightness adjustment to ImageData.
+     * @param {ImageData} imageData - The ImageData object to modify.
+     * @param {number} amount - Brightness change amount (-100 to 100).
+     * @returns {ImageData} The modified ImageData object.
+     */
+    function applyBrightness(imageData, amount) {
+        let pixels = imageData.data;
+        let brightnessFactor = amount / 100 * 255; // Convert percentage to 0-255 range
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            pixels[i] = Math.min(255, Math.max(0, pixels[i] + brightnessFactor));
+            pixels[i + 1] = Math.min(255, Math.max(0, pixels[i + 1] + brightnessFactor));
+            pixels[i + 2] = Math.min(255, Math.max(0, pixels[i + 2] + brightnessFactor));
+        }
+        return imageData;
+    }
+
+    /**
+     * Applies a threshold (binarization) effect to ImageData.
+     * @param {ImageData} imageData - The ImageData object to modify.
+     * @param {number} threshold - The threshold value (0-255).
+     * @returns {ImageData} The modified ImageData object.
+     */
+    function applyThreshold(imageData, threshold) {
+        let pixels = imageData.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+            let avg = getLuminosity(pixels[i], pixels[i + 1], pixels[i + 2]);
+            let value = avg > threshold ? 255 : 0;
+            pixels[i] = value;
+            pixels[i + 1] = value;
+            pixels[i + 2] = value;
+        }
+        return imageData;
+    }
+
+    /**
+     * Applies a simple box blur to ImageData.
+     * Creates and returns a new ImageData object with the blurred result.
+     * @param {ImageData} imageData - The ImageData object to blur.
+     * @param {number} radius - The blur radius (e.g., 1 for 3x3, 2 for 5x5).
+     * @returns {ImageData} New ImageData object with blurred pixels.
+     */
+    function applyBoxBlur(imageData, radius) {
+        if (radius === 0) return imageData; // No blur if radius is 0
+
+        let pixels = imageData.data;
+        let width = imageData.width;
+        let height = imageData.height;
+        let tempPixels = new Uint8ClampedArray(pixels); // Copy original pixels to read from
+
+        let newImageData = new ImageData(width, height);
+        let newPixels = newImageData.data;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let rSum = 0, gSum = 0, bSum = 0, count = 0;
+
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        let nx = x + dx;
+                        let ny = y + dy;
+
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            let idx = (ny * width + nx) * 4;
+                            rSum += tempPixels[idx];
+                            gSum += tempPixels[idx + 1];
+                            bSum += tempPixels[idx + 2];
+                            count++;
+                        }
+                    }
+                }
+                let currentIdx = (y * width + x) * 4;
+                newPixels[currentIdx] = rSum / count;
+                newPixels[currentIdx + 1] = gSum / count;
+                newPixels[currentIdx + 2] = bSum / count;
+                newPixels[currentIdx + 3] = pixels[currentIdx + 3]; // Keep alpha
+            }
+        }
+        return newImageData;
+    }
+
+    /**
+     * Applies a sketch effect to ImageData (Grayscale + Invert + Blur + Color Dodge Approximation).
+     * Returns a new ImageData object with the sketch effect.
+     * @param {ImageData} originalImageData - The ImageData object (already adjusted if any basic filters applied).
+     * @returns {ImageData} New ImageData object with sketch effect.
+     */
+    function applySketchEffect(imageDataToSketch) {
+        let width = imageDataToSketch.width;
+        let height = imageDataToSketch.height;
+        let pixels = imageDataToSketch.data; // Work on the provided imageDataToSketch
+
+        // Create Grayscale version from current pixels
+        let grayscaleImageData = new ImageData(width, height);
+        let grayscalePixels = grayscaleImageData.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+            let avg = getLuminosity(pixels[i], pixels[i + 1], pixels[i + 2]);
+            grayscalePixels[i] = avg;
+            grayscalePixels[i + 1] = avg;
+            grayscalePixels[i + 2] = avg;
+            grayscalePixels[i + 3] = pixels[i + 3]; // Alpha
+        }
+
+        // Create Inverted Grayscale version
+        let invertedGrayscaleImageData = new ImageData(width, height);
+        let invertedGrayscalePixels = invertedGrayscaleImageData.data;
+        for (let i = 0; i < grayscalePixels.length; i += 4) {
+            invertedGrayscalePixels[i] = 255 - grayscalePixels[i];
+            invertedGrayscalePixels[i + 1] = 255 - grayscalePixels[i + 1];
+            invertedGrayscalePixels[i + 2] = 255 - grayscalePixels[i + 2];
+            invertedGrayscalePixels[i + 3] = grayscalePixels[i + 3]; // Alpha
+        }
+
+        // Blur the Inverted Grayscale image
+        let blurredInvertedGrayscaleImageData = applyBoxBlur(invertedGrayscaleImageData, 2); // Radius 2
+        let blurredInvertedGrayscalePixels = blurredInvertedGrayscaleImageData.data;
+
+        // Apply Color Dodge approximation
+        let finalImageData = new ImageData(width, height);
+        let finalPixels = finalImageData.data;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            let originalGray = grayscalePixels[i];
+            let invertedBlurredGray = blurredInvertedGrayscalePixels[i];
+
+            let finalValue;
+            let denominator = 255 - invertedBlurredGray;
+
+            if (denominator === 0) {
+                finalValue = 255;
+            } else {
+                finalValue = Math.min(255, Math.max(0, (originalGray / denominator) * 255));
+            }
+
+            finalPixels[i] = finalValue;
+            finalPixels[i + 1] = finalValue;
+            finalPixels[i + 2] = finalValue;
+            finalPixels[i + 3] = pixels[i + 3]; // Keep original alpha
+        }
+        return finalImageData;
+    }
+
+    /**
+     * Applies a cartoon effect (posterization) to ImageData.
+     * Reduces the number of color levels for each channel.
+     * @param {ImageData} imageData - The ImageData object to modify.
+     * @param {number} levels - The number of color levels per channel (e.g., 8, 16, 32).
+     * @returns {ImageData} The modified ImageData object.
+     */
+    function applyCartoonEffect(imageData, levels = 16) {
+        let pixels = imageData.data;
+        let step = 255 / (levels - 1); // Calculate the step size between color levels
+
+        for (let i = 0; i < pixels.length; i += 4) {
+            pixels[i] = Math.round(pixels[i] / step) * step;     // Red
+            pixels[i + 1] = Math.round(pixels[i + 1] / step) * step; // Green
+            pixels[i + 2] = Math.round(pixels[i + 2] / step) * step; // Blue
+        }
+        return imageData; // Return the modified ImageData object
+    }
+
+
+    // --- Image Upload and Initialization ---
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+
+      // Reset previous state
+      messageDiv.textContent = '';
+      setControlsEnabled(false); // Disable all controls initially
+
+      if (!file) {
+        // Clear canvas if no file selected
+        ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+        imageCanvas.width = 0;
+        imageCanvas.height = 0;
+        originalImage.src = '';
+        currentImageData = null;
+        
+        // Reset filter settings and UI sliders
+        resetFilterSettingsAndUI();
+        frameSettings = { color: '#000000', thickness: 0 };
+        frameThicknessInput.value = 0;
+        thicknessValueSpan.textContent = `0 بكسل`;
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        messageDiv.textContent = 'الرجاء رفع ملف صورة صالح (مثل JPEG, PNG, GIF).';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadstart = () => {
+        messageDiv.textContent = 'جاري تحميل الصورة...';
+      };
+      reader.onload = (e) => {
+        originalImage.onload = () => {
+          messageDiv.textContent = 'تم تحميل الصورة بنجاح.';
+          // Set canvas dimensions to match image for processing
+          imageCanvas.width = originalImage.width;
+          imageCanvas.height = originalImage.height;
+          
+          resetFilterSettingsAndUI(); // Reset settings to default for new image
+          applyAllFilters(); // Draw the original image initially with default filters
+          setControlsEnabled(true); // Enable controls after image is loaded
+        };
+        originalImage.onerror = () => {
+          messageDiv.textContent = 'حدث خطأ أثناء تحميل الصورة.';
+          setControlsEnabled(false);
+          resetFilterSettingsAndUI(); // Ensure UI is reset on error
+        };
+        originalImage.src = e.target.result; // Set originalImage src to trigger onload
+      };
+      reader.onerror = () => {
+        messageDiv.textContent = 'حدث خطأ أثناء قراءة الملف.';
+        setControlsEnabled(false);
+        resetFilterSettingsAndUI(); // Ensure UI is reset on error
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /**
+     * Resets all filter settings to default values and updates the UI sliders.
+     */
+    function resetFilterSettingsAndUI() {
+        currentFilterSettings = {
+            brightness: 0,
+            threshold: 128,
+            blur: 0,
+            selectedEffect: null
+        };
+        brightnessSlider.value = 0;
+        brightnessValueSpan.textContent = '0%';
+        thresholdSlider.value = 128;
+        thresholdValueSpan.textContent = '128';
+        blurSlider.value = 0;
+        blurValueSpan.textContent = '0 بكسل';
+        // Note: Special effect buttons are not "reset" visually here, they are simply deselected by `selectedEffect: null`
+    }
+
+    /**
+     * Downloads the currently displayed image from the canvas.
+     */
+    function downloadImage() {
+        if (!originalImage.src || downloadBtn.disabled) {
+            messageDiv.textContent = 'الرجاء رفع صورة أولاً أو انتظار انتهاء التحميل.';
+            return;
+        }
+
+        messageDiv.textContent = 'جاري إعداد التنزيل...';
+        
+        const format = outputFormat.value;
+        let quality = 0.9; // Default quality for JPEG/WebP
+
+        if (format === 'image/jpeg' || format === 'image/webp') {
+            quality = 0.9; // Fixed quality, could be a user setting
+        }
+
+        try {
+            const dataUrl = imageCanvas.toDataURL(format, quality);
+
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            
+            let fileExtension = 'jpg';
+            if (format === 'image/png') {
+              fileExtension = 'png';
+            } else if (format === 'image/webp') {
+              fileExtension = 'webp';
+            }
+
+            a.download = `edited_image.${fileExtension}`;
+            document.body.appendChild(a); // Append to body to make it clickable
+            a.click(); // Programmatically click the link to trigger download
+            document.body.removeChild(a); // Remove link after click
+
+            messageDiv.textContent = 'تم تنزيل الصورة بنجاح!';
+        } catch (error) {
+            messageDiv.textContent = `حدث خطأ أثناء التنزيل: ${error.message}`;
+            console.error('Download error:', error);
+        }
+    }
+  </script>
+</body>
+</html>
